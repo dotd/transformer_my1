@@ -16,14 +16,16 @@ class MultiHeadAttention(torch.nn.Module):
         self.n_heads = n_heads  # 8
         self.single_head_dim = int(self.embed_dim / self.n_heads)  # 512/8 = 64  . each key,query, value will be of 64d
 
-        # key,query and value matrixes    #64 x 64
-        # single key matrix for all 8 keys #512x512
+        # single key matrix of 64x64 for all 8 keys 512x512
+
+        # key,query and value matrices    #64 x 64
         self.query_matrix = torch.nn.Linear(self.single_head_dim, self.single_head_dim, bias=False)
         self.key_matrix = torch.nn.Linear(self.single_head_dim, self.single_head_dim, bias=False)
         self.value_matrix = torch.nn.Linear(self.single_head_dim, self.single_head_dim, bias=False)
         self.out = torch.nn.Linear(self.n_heads * self.single_head_dim, self.embed_dim)
 
-    def forward(self, key, query, value, mask=None):  # batch_size x sequence_length x embedding_dim    # 32 x 10 x 512
+    def forward(self, key, query, value, mask=None):
+        # batch_size x sequence_length x embedding_dim    # 32 x 10 x 512
 
         """
         Args:
@@ -42,11 +44,12 @@ class MultiHeadAttention(torch.nn.Module):
         # so we cant take general seq_length
         seq_length_query = query.size(1)
 
-        # 32x10x512
-        key = key.view(batch_size, seq_length, self.n_heads,
-                       self.single_head_dim)  # batch_size x sequence_length x n_heads x single_head_dim = (32x10x8x64)
-        query = query.view(batch_size, seq_length_query, self.n_heads, self.single_head_dim)  # (32x10x8x64)
-        value = value.view(batch_size, seq_length, self.n_heads, self.single_head_dim)  # (32x10x8x64)
+        # key, query, and value from 32x10x512 to 32x10x8x64
+        # batch_size x sequence_length x n_heads x single_head_dim = (32x10x8x64)
+        # We reshape it for the multi-head attention
+        key = key.view(batch_size, seq_length, self.n_heads, self.single_head_dim)
+        query = query.view(batch_size, seq_length_query, self.n_heads, self.single_head_dim)
+        value = value.view(batch_size, seq_length, self.n_heads, self.single_head_dim)
 
         k = self.key_matrix(key)  # (32x10x8x64)
         q = self.query_matrix(query)
@@ -59,6 +62,7 @@ class MultiHeadAttention(torch.nn.Module):
         # computes attention
         # adjust key for matrix multiplication
         k_adjusted = k.transpose(-1, -2)  # (batch_size, n_heads, single_head_dim, seq_ken)  #(32 x 8 x 64 x 10)
+        # The following line generates the table of scores of each key against
         product = torch.matmul(q, k_adjusted)  # (32 x 8 x 10 x 64) x (32 x 8 x 64 x 10) = #(32x8x10x10)
 
         # Fill those positions of product matrix as (-1e20) where mask positions are 0
